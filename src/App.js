@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, Tag, Loader2, Database, ExternalLink } from 'lucide-react';
+import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, Tag, Loader2, Database, ExternalLink, Video } from 'lucide-react';
 
 // Ícone de Cadeado Nativo (À prova de falhas de versão)
 const LockIcon = ({ className }) => (
@@ -23,14 +23,13 @@ const FORM_ARTIGOS = 'https://docs.google.com/forms/d/e/1FAIpQLSfY9tWHignjRqzL30
 // Password de Acesso à Gestão (Mude para a que preferir)
 const GESTAO_PASSWORD = 'cucp2026';
 
-// Link do Logótipo - AGORA SUPORTA LINKS DO GOOGLE DRIVE!
-// Coloque aqui um link partilhado do seu Google Drive (ex: https://drive.google.com/file/d/...)
+// Link do Logótipo
 const LOGO_URL = 'https://drive.google.com/file/d/1T7rAFvvK9tYSrUUHDUUK0jQaC96VkHtA/view?usp=sharing';
 
 // ============================================================================
-// MOTOR DE COMUNICAÇÃO COM GOOGLE SHEETS
+// MOTOR DE COMUNICAÇÃO COM GOOGLE SHEETS E MULTIMÉDIA
 // ============================================================================
-const EXPECTED_KEYS = ['id', 'name', 'title', 'category', 'origin', 'fortuneLocation', 'description', 'images', 'relatedPalacetes', 'relatedArticles', 'bibliografia', 'ownerIds', 'year', 'distrito', 'concelho', 'location', 'artistic', 'excerpt', 'content', 'relatedFigures'];
+const EXPECTED_KEYS = ['id', 'name', 'title', 'category', 'origin', 'fortuneLocation', 'description', 'images', 'relatedPalacetes', 'relatedArticles', 'bibliografia', 'ownerIds', 'year', 'distrito', 'concelho', 'location', 'artistic', 'excerpt', 'content', 'relatedFigures', 'videoUrl'];
 
 // Helper para converter links do Google Drive em links diretos de imagem
 const getDirectImageUrl = (url) => {
@@ -46,6 +45,18 @@ const getDirectImageUrl = (url) => {
   return url;
 };
 
+// Extrator de IDs de Vídeo para Embed Automático (YouTube & Vimeo)
+const getEmbedVideoUrl = (url) => {
+  if (!url) return null;
+  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  
+  return url; // Retorna o original se não for reconhecido
+};
+
 // Tradutor Inteligente
 const normalizeKey = (rawKey) => {
   if (!rawKey) return null;
@@ -59,6 +70,7 @@ const normalizeKey = (rawKey) => {
   if (lower.includes('fortuna')) return 'fortuneLocation';
   if (lower.includes('biográfica') || lower.includes('historial') || lower === 'description') return 'description';
   if (lower.includes('imagem') || lower.includes('imagens') || lower === 'images') return 'images';
+  if (lower.includes('vídeo') || lower.includes('video')) return 'videoUrl';
   if (lower.includes('palacetes relacionados') || lower.includes('palacetes mencionados') || lower === 'relatedpalacetes') return 'relatedPalacetes';
   if (lower.includes('artigos') || lower.includes('temas') || lower === 'relatedarticles') return 'relatedArticles';
   if (lower.includes('bibliografia')) return 'bibliografia';
@@ -492,7 +504,15 @@ export default function App() {
                            ) : (
                              <Building className="w-12 h-12 text-gray-300" />
                            )}
-                           {/* Contador de fotos (ícone visual de galeria) */}
+                           
+                           {/* Ícone de Vídeo se existir */}
+                           {palacete.videoUrl && (
+                             <div className="absolute top-3 right-3 bg-amber-600/90 text-white p-1.5 rounded-full shadow-sm">
+                               <Video className="w-4 h-4" />
+                             </div>
+                           )}
+
+                           {/* Contador de fotos */}
                            {palacete.images && palacete.images.length > 1 && (
                              <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-sm tracking-widest flex items-center gap-1">
                                +{palacete.images.length - 1} FOTOS
@@ -530,8 +550,13 @@ export default function App() {
                  <p className="text-gray-400 italic col-span-full text-center">Nenhuma figura registada na base de dados.</p>
               ) : (
                  figures.map(fig => (
-                   <div key={fig.id} onClick={() => openModal(fig, 'figura')} className="bg-white border border-gray-100 p-6 text-center group cursor-pointer hover:shadow-lg transition-shadow rounded-sm flex flex-col h-full">
-                      <div className="w-32 h-32 mx-auto rounded-full overflow-hidden mb-6 bg-gray-200 border-4 border-[#faf9f6] flex items-center justify-center relative">
+                   <div key={fig.id} onClick={() => openModal(fig, 'figura')} className="bg-white border border-gray-100 p-6 text-center group cursor-pointer hover:shadow-lg transition-shadow rounded-sm flex flex-col h-full relative">
+                      {fig.videoUrl && (
+                        <div className="absolute top-4 right-4 text-amber-500">
+                          <Video className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div className="w-32 h-32 mx-auto rounded-full overflow-hidden mb-6 bg-gray-200 border-4 border-[#faf9f6] flex items-center justify-center relative mt-4">
                          {fig.images && fig.images[0] ? (
                            <img src={fig.images[0]} alt={fig.name} className="w-full h-full object-cover filter sepia-[.3] group-hover:sepia-0 transition-all duration-500" />
                          ) : (
@@ -566,6 +591,11 @@ export default function App() {
                          ) : (
                            <BookOpen className="w-12 h-12 text-gray-400" />
                          )}
+                         {artigo.videoUrl && (
+                           <div className="absolute top-3 left-3 bg-amber-600/90 text-white px-2 py-1 rounded-sm text-[9px] font-bold tracking-widest flex items-center gap-1">
+                             <Video className="w-3 h-3" /> VÍDEO
+                           </div>
+                         )}
                       </div>
                       <div className="md:w-2/3 flex flex-col justify-center">
                          <span className="text-[9px] uppercase tracking-widest text-amber-600 font-bold mb-2 block">{artigo.category || 'Ensaio'}</span>
@@ -599,7 +629,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* MODAL COM GALERIA DE IMAGENS E CONTEÚDO CRUZADO */}
+      {/* MODAL COM GALERIA DE IMAGENS, VÍDEO E CONTEÚDO CRUZADO */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-[#1a1c29]/95 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
@@ -650,8 +680,28 @@ export default function App() {
               <span className="text-amber-700 font-bold tracking-widest uppercase text-[9px] mb-2 block">
                 {modalType === 'palacete' ? 'Ficha de Património' : modalType === 'figura' ? 'Nota Biográfica' : 'Ensaio Histórico'}
               </span>
-              <h3 className="text-3xl font-serif text-[#1a1c29] mb-4 leading-tight">{selectedItem.name || selectedItem.title}</h3>
+              <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
+              {/* VÍDEO EMBEBIDO (Se Existir) */}
+              {selectedItem.videoUrl && (
+                <div className="mb-6 w-full aspect-video rounded-sm overflow-hidden bg-gray-900 border border-gray-200 shadow-sm relative">
+                  {(selectedItem.videoUrl.includes('youtube') || selectedItem.videoUrl.includes('youtu.be') || selectedItem.videoUrl.includes('vimeo')) ? (
+                    <iframe 
+                      src={getEmbedVideoUrl(selectedItem.videoUrl)}
+                      className="w-full h-full absolute inset-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="Vídeo Anexo"
+                    ></iframe>
+                  ) : (
+                    <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 hover:text-white bg-[#11121a] transition-colors">
+                      <Video className="w-8 h-8 mb-2" />
+                      <span className="text-xs font-bold uppercase tracking-widest">Abrir Vídeo Externo</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-4 text-gray-600 font-light leading-relaxed text-sm border-b border-gray-200 pb-6 mb-6">
                 <p className="whitespace-pre-wrap">{selectedItem.description || selectedItem.content}</p>
                 {selectedItem.artistic && <p className="whitespace-pre-wrap">{selectedItem.artistic}</p>}
