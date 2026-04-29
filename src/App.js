@@ -45,22 +45,22 @@ const getDirectImageUrl = (url) => {
   return url;
 };
 
-// Extrator de IDs de Vídeo para Embed Automático (YouTube & Vimeo) - VERSÃO MELHORADA
+// Extrator de IDs de Vídeo para Embed Automático (À prova de Mobile e Safari)
 const getEmbedVideoUrl = (url) => {
   if (!url) return null;
-  const cleanUrl = url.trim();
+  const cleanUrl = String(url).trim();
 
-  // Tratamento específico para YouTube
+  // Tratamento específico para YouTube (Usa youtube-nocookie para evitar bloqueios do iPhone/Safari)
   if (cleanUrl.toLowerCase().includes('youtube.com') || cleanUrl.toLowerCase().includes('youtu.be')) {
     let videoId = '';
     if (cleanUrl.includes('youtu.be/')) {
-      videoId = cleanUrl.split('youtu.be/')[1]?.split('?')[0];
+      videoId = cleanUrl.split('youtu.be/')[1]?.split(/[?#]/)[0];
     } else if (cleanUrl.includes('v=')) {
       videoId = cleanUrl.split('v=')[1]?.split('&')[0];
     } else if (cleanUrl.includes('embed/')) {
-      videoId = cleanUrl.split('embed/')[1]?.split('?')[0];
+      videoId = cleanUrl.split('embed/')[1]?.split(/[?#]/)[0];
     }
-    if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
   }
 
   // Tratamento específico para Vimeo
@@ -69,7 +69,7 @@ const getEmbedVideoUrl = (url) => {
     if (videoId) return `https://player.vimeo.com/video/${videoId}`;
   }
 
-  return cleanUrl; // Retorna o original se não for reconhecido
+  return cleanUrl; 
 };
 
 // Tradutor Inteligente
@@ -698,25 +698,30 @@ export default function App() {
               </span>
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
-              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO MELHORADA */}
-              {selectedItem.videoUrl && (
-                <div className="mb-6 w-full aspect-video rounded-sm overflow-hidden bg-[#11121a] border border-gray-200 shadow-sm relative">
-                  {(selectedItem.videoUrl.toLowerCase().includes('youtube') || selectedItem.videoUrl.toLowerCase().includes('youtu.be') || selectedItem.videoUrl.toLowerCase().includes('vimeo')) ? (
-                    <iframe 
-                      src={getEmbedVideoUrl(selectedItem.videoUrl)}
-                      className="w-full h-full absolute inset-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      title="Vídeo do Artigo"
-                    ></iframe>
-                  ) : (
-                    <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 hover:text-white transition-colors">
-                      <Video className="w-8 h-8 mb-2" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir o vídeo externamente.</span>
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO À PROVA DE MOBILE/SAFARI */}
+              {selectedItem.videoUrl && (() => {
+                 const videoUrlStr = String(selectedItem.videoUrl).toLowerCase();
+                 const isEmbeddable = videoUrlStr.includes('youtube') || videoUrlStr.includes('youtu.be') || videoUrlStr.includes('vimeo');
+                 
+                 return (
+                   <div className="mb-6 w-full relative rounded-sm overflow-hidden bg-[#11121a] shadow-sm border border-gray-200" style={{ paddingBottom: '56.25%', height: 0 }}>
+                     {isEmbeddable ? (
+                       <iframe 
+                         src={getEmbedVideoUrl(selectedItem.videoUrl)}
+                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                         allowFullScreen
+                         title="Vídeo do Artigo"
+                       ></iframe>
+                     ) : (
+                       <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center text-amber-500 hover:text-white transition-colors" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+                         <Video className="w-8 h-8 mb-2" />
+                         <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir externamente.</span>
+                       </a>
+                     )}
+                   </div>
+                 );
+              })()}
 
               <div className="space-y-4 text-gray-600 font-light leading-relaxed text-sm border-b border-gray-200 pb-6 mb-6">
                 <p className="whitespace-pre-wrap">{selectedItem.description || selectedItem.content}</p>
