@@ -70,7 +70,7 @@ const normalizeKey = (rawKey) => {
   if (lower.includes('fortuna')) return 'fortuneLocation';
   if (lower.includes('biográfica') || lower.includes('historial') || lower === 'description') return 'description';
   if (lower.includes('imagem') || lower.includes('imagens') || lower === 'images') return 'images';
-  if (lower.includes('vídeo') || lower.includes('video')) return 'videoUrl';
+  if (lower.includes('vídeo') || lower.includes('video') || lower.includes('youtube')) return 'videoUrl';
   if (lower.includes('palacetes relacionados') || lower.includes('palacetes mencionados') || lower === 'relatedpalacetes') return 'relatedPalacetes';
   if (lower.includes('artigos') || lower.includes('temas') || lower === 'relatedarticles') return 'relatedArticles';
   if (lower.includes('bibliografia')) return 'bibliografia';
@@ -90,7 +90,7 @@ const normalizeKey = (rawKey) => {
 const fetchSheetData = async (sheetName) => {
   if (!SHEET_ID || SHEET_ID.includes('COLOQUE_AQUI')) return [];
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1&t=${new Date().getTime()}`;
     const res = await fetch(url);
     const text = await res.text();
     const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/)[1];
@@ -113,6 +113,7 @@ const fetchSheetData = async (sheetName) => {
 
         const key = normalizeKey(rawKey);
         let value = (cell && cell.v !== null) ? cell.v : '';
+        if (typeof value === 'string') value = value.trim();
         
         if (key === 'images') {
            obj[key] = value ? value.toString().split(',').map(s => getDirectImageUrl(s.trim())) : [];
