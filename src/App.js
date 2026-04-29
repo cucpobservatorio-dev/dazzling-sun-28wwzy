@@ -105,10 +105,21 @@ const normalizeKey = (rawKey) => {
 const fetchSheetData = async (sheetName) => {
   if (!SHEET_ID || SHEET_ID.includes('COLOQUE_AQUI')) return [];
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1&t=${new Date().getTime()}`;
-    const res = await fetch(url);
+    // URL limpo (sem &t=) e cache bypass via headers
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1`;
+    const res = await fetch(url, { cache: 'no-cache' });
     const text = await res.text();
-    const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/)[1];
+    
+    // Escudo: Se a Google devolver HTML (página de erro), ignoramos para não crashar a app
+    if (text.trim().startsWith('<')) {
+      console.error(`Erro: O Google Sheets retornou HTML para a folha ${sheetName}.`);
+      return [];
+    }
+
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/);
+    if (!match) return [];
+
+    const jsonString = match[1];
     const data = JSON.parse(jsonString);
     
     let headers = data.table.cols.map(c => c.label ? c.label.toString().trim() : '');
@@ -418,7 +429,7 @@ export default function App() {
         <main className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 text-center">
           <span className="text-amber-600 font-bold tracking-[0.3em] uppercase text-[10px] mb-4">Homenagem aos Torna-Viagem</span>
           <h1 className="text-5xl md:text-8xl font-serif text-[#11121a] mb-6 leading-none italic">O Legado <span className="not-italic font-bold">Material</span></h1>
-          <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed font-light mb-12">Exploração prosopográfica e arquitetónica do impacto do capital de retorno oitocentista na paisagem portuguesa.</p>
+          <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed font-light mb-12">Descubra os 'Brasileiros de torna-viagem' e a marca indelével que deixaram na nossa cultura e paisagem.</p>
           <div className="flex flex-wrap justify-center gap-4">
             <button onClick={() => handleNav('patrimonio')} className="bg-[#11121a] text-white px-6 md:px-8 py-3 md:py-4 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:bg-amber-800 transition-colors">Explorar Património</button>
             <button onClick={() => handleNav('figuras')} className="border border-gray-300 text-gray-700 px-6 md:px-8 py-3 md:py-4 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:border-amber-600 transition-colors">Protagonistas</button>
@@ -698,23 +709,24 @@ export default function App() {
               </span>
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
-              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO À PROVA DE MOBILE/SAFARI */}
+              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO ROBUSTA */}
               {selectedItem.videoUrl && (() => {
                  const videoUrlStr = String(selectedItem.videoUrl).toLowerCase();
                  const isEmbeddable = videoUrlStr.includes('youtube') || videoUrlStr.includes('youtu.be') || videoUrlStr.includes('vimeo');
                  
                  return (
-                   <div className="mb-6 w-full relative rounded-sm overflow-hidden bg-[#11121a] shadow-sm border border-gray-200" style={{ paddingBottom: '56.25%', height: 0 }}>
+                   <div className="mb-6 w-full rounded-sm overflow-hidden bg-[#11121a] shadow-sm border border-gray-200">
                      {isEmbeddable ? (
                        <iframe 
                          src={getEmbedVideoUrl(selectedItem.videoUrl)}
-                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                         className="w-full aspect-video"
+                         style={{ minHeight: '300px' }}
                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                          allowFullScreen
                          title="Vídeo do Artigo"
                        ></iframe>
                      ) : (
-                       <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center text-amber-500 hover:text-white transition-colors" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+                       <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-12 text-amber-500 hover:text-white transition-colors w-full h-full">
                          <Video className="w-8 h-8 mb-2" />
                          <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir externamente.</span>
                        </a>
