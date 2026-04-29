@@ -45,16 +45,31 @@ const getDirectImageUrl = (url) => {
   return url;
 };
 
-// Extrator de IDs de Vídeo para Embed Automático (YouTube & Vimeo)
+// Extrator de IDs de Vídeo para Embed Automático (YouTube & Vimeo) - VERSÃO MELHORADA
 const getEmbedVideoUrl = (url) => {
   if (!url) return null;
-  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-  
-  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-  
-  return url; // Retorna o original se não for reconhecido
+  const cleanUrl = url.trim();
+
+  // Tratamento específico para YouTube
+  if (cleanUrl.toLowerCase().includes('youtube.com') || cleanUrl.toLowerCase().includes('youtu.be')) {
+    let videoId = '';
+    if (cleanUrl.includes('youtu.be/')) {
+      videoId = cleanUrl.split('youtu.be/')[1]?.split('?')[0];
+    } else if (cleanUrl.includes('v=')) {
+      videoId = cleanUrl.split('v=')[1]?.split('&')[0];
+    } else if (cleanUrl.includes('embed/')) {
+      videoId = cleanUrl.split('embed/')[1]?.split('?')[0];
+    }
+    if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // Tratamento específico para Vimeo
+  if (cleanUrl.toLowerCase().includes('vimeo.com/')) {
+    const videoId = cleanUrl.split('vimeo.com/')[1]?.split(/[?#]/)[0];
+    if (videoId) return `https://player.vimeo.com/video/${videoId}`;
+  }
+
+  return cleanUrl; // Retorna o original se não for reconhecido
 };
 
 // Tradutor Inteligente
@@ -683,21 +698,21 @@ export default function App() {
               </span>
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
-              {/* VÍDEO EMBEBIDO (Se Existir) */}
+              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO MELHORADA */}
               {selectedItem.videoUrl && (
-                <div className="mb-6 w-full aspect-video rounded-sm overflow-hidden bg-gray-900 border border-gray-200 shadow-sm relative">
-                  {(selectedItem.videoUrl.includes('youtube') || selectedItem.videoUrl.includes('youtu.be') || selectedItem.videoUrl.includes('vimeo')) ? (
+                <div className="mb-6 w-full aspect-video rounded-sm overflow-hidden bg-[#11121a] border border-gray-200 shadow-sm relative">
+                  {(selectedItem.videoUrl.toLowerCase().includes('youtube') || selectedItem.videoUrl.toLowerCase().includes('youtu.be') || selectedItem.videoUrl.toLowerCase().includes('vimeo')) ? (
                     <iframe 
                       src={getEmbedVideoUrl(selectedItem.videoUrl)}
                       className="w-full h-full absolute inset-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
-                      title="Vídeo Anexo"
+                      title="Vídeo do Artigo"
                     ></iframe>
                   ) : (
-                    <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 hover:text-white bg-[#11121a] transition-colors">
+                    <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 hover:text-white transition-colors">
                       <Video className="w-8 h-8 mb-2" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Abrir Vídeo Externo</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir o vídeo externamente.</span>
                     </a>
                   )}
                 </div>
