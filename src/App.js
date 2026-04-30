@@ -105,7 +105,7 @@ const normalizeKey = (rawKey) => {
 const fetchSheetData = async (sheetName) => {
   if (!SHEET_ID || SHEET_ID.includes('COLOQUE_AQUI')) return [];
   try {
-    // URL limpo (sem &t=) e cache bypass via headers
+    // URL limpo e cache bypass via headers
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1`;
     const res = await fetch(url, { cache: 'no-cache' });
     const text = await res.text();
@@ -677,7 +677,8 @@ export default function App() {
       </footer>
 
       {/* MODAL COM GALERIA DE IMAGENS, VÍDEO E CONTEÚDO CRUZADO */}
-      {selectedItem && !isFullscreen && (
+      {/* ⚠️ NOTA: A tag '!isFullscreen' foi removida para garantir que a janela não colapsa ao abrir o zoom */}
+      {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-[#1a1c29]/95 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
           
@@ -690,22 +691,21 @@ export default function App() {
             <div className="w-full md:w-2/5 h-64 md:h-auto bg-gray-200 flex flex-col flex-shrink-0 relative border-r border-gray-200/50">
               {selectedItem.images && selectedItem.images.length > 0 ? (
                  <>
-                   {/* Imagem Principal com Opção de Expandir */}
+                   {/* Imagem Principal com Opção de Expandir (Botão Visível Sempre) */}
                    <div 
-                     className="flex-1 relative w-full h-full min-h-0 cursor-zoom-in group bg-black"
+                     className="flex-1 relative w-full h-full min-h-[250px] cursor-zoom-in group bg-black"
                      onClick={() => setIsFullscreen(true)}
                      title="Clique para ver em ecrã inteiro"
                    >
                      <img 
                        src={selectedItem.images[activeImageIndex]} 
                        alt={selectedItem.title || selectedItem.name} 
-                       className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-60 transition-opacity duration-300" 
+                       className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity duration-300" 
                      />
-                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                       <div className="bg-black/60 text-white p-3 rounded-full backdrop-blur-sm shadow-xl flex items-center gap-2">
-                         <Maximize2 className="w-5 h-5" />
-                         <span className="text-[10px] font-bold uppercase tracking-widest">Expandir</span>
-                       </div>
+                     {/* Botão Expandir visível permanentemente (Melhor para Touch/Tablets/Edge) */}
+                     <div className="absolute top-3 left-3 bg-black/70 text-white px-3 py-1.5 rounded-sm backdrop-blur-sm shadow-md flex items-center gap-2 hover:bg-amber-600 transition-colors">
+                       <Maximize2 className="w-4 h-4" />
+                       <span className="text-[10px] font-bold uppercase tracking-widest">Expandir</span>
                      </div>
                    </div>
                    
@@ -740,7 +740,7 @@ export default function App() {
               </span>
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
-              {/* VÍDEO EMBEBIDO (Se Existir) - VERSÃO BLINDADA EDGE/FLEXBOX */}
+              {/* VÍDEO EMBEBIDO (Se Existir) */}
               {selectedItem.videoUrl && (() => {
                  const videoUrlStr = String(selectedItem.videoUrl).toLowerCase();
                  const isEmbeddable = videoUrlStr.includes('youtube') || videoUrlStr.includes('youtu.be') || videoUrlStr.includes('vimeo');
@@ -877,7 +877,7 @@ export default function App() {
           {/* Área Principal de Imagem com Zoom */}
           <div 
             className="w-full h-full overflow-auto flex items-center justify-center cursor-zoom-in"
-            onClick={() => setZoomLevel(prev => prev === 1 ? 2.5 : 1)}
+            onClick={() => setZoomLevel(prev => prev === 1 ? 2 : 1)}
             style={{ cursor: zoomLevel > 1 ? 'zoom-out' : 'zoom-in' }}
           >
             <img 
