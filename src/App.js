@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, Tag, Loader2, Database, ExternalLink, Video } from 'lucide-react';
+import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, ChevronLeft, Tag, Loader2, Database, ExternalLink, Video, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 // Ícone de Cadeado Nativo (À prova de falhas de versão)
 const LockIcon = ({ className }) => (
@@ -172,6 +172,10 @@ export default function App() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [filterLocation, setFilterLocation] = useState({ distrito: 'Todos', concelho: 'Todos' });
 
+  // Estados do Modo Imagem Ecrã Inteiro (Zoom)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
   // Estados de Segurança (Acesso à Gestão)
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -183,10 +187,10 @@ export default function App() {
   const [logoHeaderError, setLogoHeaderError] = useState(false);
   const [logoFooterError, setLogoFooterError] = useState(false);
 
-  // Rotação Automática de Imagens
+  // Rotação Automática de Imagens (Apenas se não estiver no ecrã inteiro)
   useEffect(() => {
     let intervalId;
-    if (selectedItem && selectedItem.images && selectedItem.images.length > 1) {
+    if (selectedItem && selectedItem.images && selectedItem.images.length > 1 && !isFullscreen) {
       intervalId = setInterval(() => {
         setActiveImageIndex((prevIndex) => 
           (prevIndex + 1) % selectedItem.images.length
@@ -196,7 +200,7 @@ export default function App() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [selectedItem, activeImageIndex]);
+  }, [selectedItem, activeImageIndex, isFullscreen]);
 
   // Injetor de CSS
   useEffect(() => {
@@ -260,12 +264,16 @@ export default function App() {
     setSelectedItem(item);
     setModalType(type);
     setActiveImageIndex(0); 
+    setIsFullscreen(false);
+    setZoomLevel(1);
     document.body.style.overflow = 'hidden';
   };
 
   const closeModal = () => {
     setSelectedItem(null);
     setModalType(null);
+    setIsFullscreen(false);
+    setZoomLevel(1);
     document.body.style.overflow = 'auto';
   };
 
@@ -276,6 +284,18 @@ export default function App() {
     (type === 'palacete' && art.relatedPalacetes?.includes(id)) ||
     (type === 'artigo' && (art.relatedFigures?.includes(id) || art.relatedPalacetes?.includes(id)))
   );
+
+  // Lógica do Ecrã Inteiro de Imagens
+  const handleNextImage = (e) => {
+    e.stopPropagation();
+    setActiveImageIndex((prev) => (prev + 1) % selectedItem.images.length);
+    setZoomLevel(1); // Reset zoom
+  };
+  const handlePrevImage = (e) => {
+    e.stopPropagation();
+    setActiveImageIndex((prev) => (prev - 1 + selectedItem.images.length) % selectedItem.images.length);
+    setZoomLevel(1); // Reset zoom
+  };
 
   // === LÓGICA DO DIRETÓRIO GEOGRÁFICO ===
   const distritosList = [...new Set(palacetes.map(p => p.distrito ? String(p.distrito).trim() : 'Não Definido'))]
@@ -305,10 +325,10 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] text-gray-800 font-sans flex flex-col">
+    <div className="min-h-screen bg-[#faf9f6] text-gray-800 font-sans flex flex-col relative">
       
       {/* HEADER ADAPTÁVEL */}
-      <header className="bg-[#11121a] text-white sticky top-0 z-50 shadow-xl border-b border-amber-900/20">
+      <header className="bg-[#11121a] text-white sticky top-0 z-40 shadow-xl border-b border-amber-900/20">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
              
@@ -657,31 +677,41 @@ export default function App() {
       </footer>
 
       {/* MODAL COM GALERIA DE IMAGENS, VÍDEO E CONTEÚDO CRUZADO */}
-      {selectedItem && (
+      {selectedItem && !isFullscreen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-[#1a1c29]/95 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
           
-          <div className="relative bg-[#faf9f6] w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-sm shadow-2xl flex flex-col md:flex-row">
-            <button onClick={closeModal} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-gray-900 rounded-full p-2 z-10 transition-colors shadow-sm">
+          <div className="relative bg-[#faf9f6] w-full max-w-4xl max-h-[90vh] min-h-[60vh] overflow-hidden rounded-sm shadow-2xl flex flex-col md:flex-row">
+            <button onClick={closeModal} className="absolute top-4 right-4 bg-white/80 hover:bg-white text-gray-900 rounded-full p-2 z-20 transition-colors shadow-sm">
               <X className="w-5 h-5" />
             </button>
 
             {/* SEÇÃO DA IMAGEM E GALERIA */}
-            <div className="md:w-2/5 h-64 md:h-auto relative bg-gray-200 flex flex-col">
+            <div className="w-full md:w-2/5 h-64 md:h-auto bg-gray-200 flex flex-col flex-shrink-0 relative border-r border-gray-200/50">
               {selectedItem.images && selectedItem.images.length > 0 ? (
                  <>
-                   {/* Imagem Principal */}
-                   <div className="flex-1 w-full relative min-h-[250px]">
+                   {/* Imagem Principal com Opção de Expandir */}
+                   <div 
+                     className="flex-1 relative w-full h-full min-h-0 cursor-zoom-in group bg-black"
+                     onClick={() => setIsFullscreen(true)}
+                     title="Clique para ver em ecrã inteiro"
+                   >
                      <img 
                        src={selectedItem.images[activeImageIndex]} 
                        alt={selectedItem.title || selectedItem.name} 
-                       className="w-full h-full object-cover absolute inset-0 transition-opacity duration-500 ease-in-out" 
+                       className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-60 transition-opacity duration-300" 
                      />
+                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                       <div className="bg-black/60 text-white p-3 rounded-full backdrop-blur-sm shadow-xl flex items-center gap-2">
+                         <Maximize2 className="w-5 h-5" />
+                         <span className="text-[10px] font-bold uppercase tracking-widest">Expandir</span>
+                       </div>
+                     </div>
                    </div>
                    
                    {/* Miniaturas (Thumbnails) */}
                    {selectedItem.images.length > 1 && (
-                     <div className="flex gap-2 p-3 bg-gray-900 overflow-x-auto">
+                     <div className="flex gap-2 p-3 bg-gray-900 overflow-x-auto flex-shrink-0">
                        {selectedItem.images.map((img, idx) => (
                          <button
                            key={idx}
@@ -695,7 +725,7 @@ export default function App() {
                    )}
                  </>
               ) : (
-                 <div className="w-full h-full flex items-center justify-center bg-gray-100 flex-1">
+                 <div className="flex-1 w-full h-full flex items-center justify-center bg-gray-100">
                    {modalType === 'palacete' && <Building className="w-16 h-16 text-gray-300" />}
                    {modalType === 'figura' && <User className="w-16 h-16 text-gray-300" />}
                    {modalType === 'artigo' && <BookOpen className="w-16 h-16 text-gray-300" />}
@@ -703,7 +733,8 @@ export default function App() {
               )}
             </div>
 
-            <div className="md:w-3/5 p-8 md:p-10 flex flex-col">
+            {/* SEÇÃO DE TEXTO (Com barra de scroll independente) */}
+            <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col overflow-y-auto">
               <span className="text-amber-700 font-bold tracking-widest uppercase text-[9px] mb-2 block">
                 {modalType === 'palacete' ? 'Ficha de Património' : modalType === 'figura' ? 'Nota Biográfica' : 'Ensaio Histórico'}
               </span>
@@ -826,6 +857,84 @@ export default function App() {
 
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY DE ECRÃ INTEIRO (LIGHTBOX COM ZOOM) */}
+      {isFullscreen && selectedItem && selectedItem.images && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center select-none animate-in fade-in duration-300">
+          
+          {/* Botão Fechar */}
+          <button 
+            onClick={() => setIsFullscreen(false)} 
+            className="absolute top-6 right-6 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 p-2 rounded-full z-50 transition-all"
+            title="Fechar (Esc)"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          {/* Área Principal de Imagem com Zoom */}
+          <div 
+            className="w-full h-full overflow-auto flex items-center justify-center cursor-zoom-in"
+            onClick={() => setZoomLevel(prev => prev === 1 ? 2.5 : 1)}
+            style={{ cursor: zoomLevel > 1 ? 'zoom-out' : 'zoom-in' }}
+          >
+            <img 
+              src={selectedItem.images[activeImageIndex]} 
+              alt="Modo Ecrã Inteiro"
+              style={{ transform: `scale(${zoomLevel})`, transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+              className="max-w-full max-h-full object-contain origin-center"
+            />
+          </div>
+
+          {/* Controlos de Navegação (Setas) */}
+          {selectedItem.images.length > 1 && (
+            <>
+              <button 
+                onClick={handlePrevImage}
+                className="absolute left-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/20 hover:bg-black/60 p-3 rounded-full z-50 transition-all backdrop-blur-sm"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+              <button 
+                onClick={handleNextImage}
+                className="absolute right-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/20 hover:bg-black/60 p-3 rounded-full z-50 transition-all backdrop-blur-sm"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            </>
+          )}
+
+          {/* Controlos de Zoom Inferiores */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full z-50 border border-white/10 shadow-2xl">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setZoomLevel(z => Math.max(1, z - 0.5)); }} 
+              className="text-white/70 hover:text-white transition-colors"
+              title="Afastar"
+            >
+              <ZoomOut className="w-6 h-6" />
+            </button>
+            <span className="text-white/50 text-xs font-bold font-mono min-w-[3ch] text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setZoomLevel(z => Math.min(4, z + 0.5)); }} 
+              className="text-white/70 hover:text-white transition-colors"
+              title="Aproximar"
+            >
+              <ZoomIn className="w-6 h-6" />
+            </button>
+            
+            {/* Divisória e Indicador de Galeria */}
+            {selectedItem.images.length > 1 && (
+              <>
+                <div className="w-px h-6 bg-white/20 mx-2"></div>
+                <span className="text-white/70 text-xs font-bold tracking-widest uppercase">
+                  {activeImageIndex + 1} de {selectedItem.images.length}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
