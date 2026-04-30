@@ -1,11 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, ChevronLeft, Tag, Loader2, Database, ExternalLink, Video, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, Tag, Loader2, Database, ExternalLink, Video } from 'lucide-react';
 
-// Ícone de Cadeado Nativo (À prova de falhas de versão)
+// ============================================================================
+// ÍCONES NATIVOS (À prova de falhas de versão do lucide-react)
+// ============================================================================
 const LockIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+const ExpandIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+  </svg>
+);
+const ZoomInIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+  </svg>
+);
+const ZoomOutIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>
+  </svg>
+);
+const ChevronLeftIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 18 9 12 15 6"/>
   </svg>
 );
 
@@ -172,9 +193,10 @@ export default function App() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [filterLocation, setFilterLocation] = useState({ distrito: 'Todos', concelho: 'Todos' });
 
-  // Estados do Modo Imagem Ecrã Inteiro (Zoom)
+  // Estados do Modo Imagem Ecrã Inteiro (Zoom Dinâmico)
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 }); // Foco do Zoom
 
   // Estados de Segurança (Acesso à Gestão)
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -266,6 +288,7 @@ export default function App() {
     setActiveImageIndex(0); 
     setIsFullscreen(false);
     setZoomLevel(1);
+    setZoomOrigin({ x: 50, y: 50 });
     document.body.style.overflow = 'hidden';
   };
 
@@ -285,16 +308,31 @@ export default function App() {
     (type === 'artigo' && (art.relatedFigures?.includes(id) || art.relatedPalacetes?.includes(id)))
   );
 
-  // Lógica do Ecrã Inteiro de Imagens
+  // Lógica do Ecrã Inteiro de Imagens e Zoom Dinâmico
   const handleNextImage = (e) => {
     e.stopPropagation();
     setActiveImageIndex((prev) => (prev + 1) % selectedItem.images.length);
-    setZoomLevel(1); // Reset zoom
+    setZoomLevel(1); 
   };
   const handlePrevImage = (e) => {
     e.stopPropagation();
     setActiveImageIndex((prev) => (prev - 1 + selectedItem.images.length) % selectedItem.images.length);
-    setZoomLevel(1); // Reset zoom
+    setZoomLevel(1); 
+  };
+
+  const handleImageZoomClick = (e) => {
+    e.stopPropagation();
+    if (zoomLevel === 1) {
+      // Calcula o ponto exato onde o utilizador clicou na imagem
+      const rect = e.target.getBoundingClientRect();
+      const clickX = ((e.clientX - rect.left) / rect.width) * 100;
+      const clickY = ((e.clientY - rect.top) / rect.height) * 100;
+      
+      setZoomOrigin({ x: clickX, y: clickY });
+      setZoomLevel(2.5); // Fator de aproximação
+    } else {
+      setZoomLevel(1); // Volta ao tamanho original
+    }
   };
 
   // === LÓGICA DO DIRETÓRIO GEOGRÁFICO ===
@@ -677,7 +715,6 @@ export default function App() {
       </footer>
 
       {/* MODAL COM GALERIA DE IMAGENS, VÍDEO E CONTEÚDO CRUZADO */}
-      {/* ⚠️ NOTA: A tag '!isFullscreen' foi removida para garantir que a janela não colapsa ao abrir o zoom */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="absolute inset-0 bg-[#1a1c29]/95 backdrop-blur-sm transition-opacity" onClick={closeModal}></div>
@@ -704,7 +741,7 @@ export default function App() {
                      />
                      {/* Botão Expandir visível permanentemente (Melhor para Touch/Tablets/Edge) */}
                      <div className="absolute top-3 left-3 bg-black/70 text-white px-3 py-1.5 rounded-sm backdrop-blur-sm shadow-md flex items-center gap-2 hover:bg-amber-600 transition-colors">
-                       <Maximize2 className="w-4 h-4" />
+                       <ExpandIcon className="w-4 h-4" />
                        <span className="text-[10px] font-bold uppercase tracking-widest">Expandir</span>
                      </div>
                    </div>
@@ -741,29 +778,26 @@ export default function App() {
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
               {/* VÍDEO EMBEBIDO (Se Existir) */}
-              {selectedItem.videoUrl && (() => {
-                 const videoUrlStr = String(selectedItem.videoUrl).toLowerCase();
-                 const isEmbeddable = videoUrlStr.includes('youtube') || videoUrlStr.includes('youtu.be') || videoUrlStr.includes('vimeo');
-                 
-                 return (
-                   <div className="mb-6 w-full flex-shrink-0" style={{ aspectRatio: '16/9' }}>
-                     {isEmbeddable ? (
-                       <iframe 
-                         src={getEmbedVideoUrl(selectedItem.videoUrl)}
-                         className="w-full h-full rounded-sm shadow-sm border border-gray-200 bg-[#11121a]"
-                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                         allowFullScreen
-                         title="Vídeo do Artigo"
-                       ></iframe>
-                     ) : (
-                       <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 bg-[#11121a] rounded-sm shadow-sm hover:text-white transition-colors">
-                         <Video className="w-8 h-8 mb-2" />
-                         <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir externamente.</span>
-                       </a>
-                     )}
-                   </div>
-                 );
-              })()}
+              {selectedItem.videoUrl && (
+                <div className="mb-6 w-full flex-shrink-0" style={{ aspectRatio: '16/9' }}>
+                  {(String(selectedItem.videoUrl).toLowerCase().includes('youtube') || 
+                    String(selectedItem.videoUrl).toLowerCase().includes('youtu.be') || 
+                    String(selectedItem.videoUrl).toLowerCase().includes('vimeo')) ? (
+                    <iframe 
+                      src={getEmbedVideoUrl(selectedItem.videoUrl)}
+                      className="w-full h-full rounded-sm shadow-sm border border-gray-200 bg-[#11121a]"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      title="Vídeo do Artigo"
+                    ></iframe>
+                  ) : (
+                    <a href={selectedItem.videoUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center w-full h-full text-amber-500 bg-[#11121a] rounded-sm shadow-sm hover:text-white transition-colors">
+                      <Video className="w-8 h-8 mb-2" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-center px-4">O formato não pôde ser embebido.<br/>Clique para abrir externamente.</span>
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-4 text-gray-600 font-light leading-relaxed text-sm border-b border-gray-200 pb-6 mb-6">
                 <p className="whitespace-pre-wrap">{selectedItem.description || selectedItem.content}</p>
@@ -861,9 +895,9 @@ export default function App() {
         </div>
       )}
 
-      {/* OVERLAY DE ECRÃ INTEIRO (LIGHTBOX COM ZOOM) */}
+      {/* OVERLAY DE ECRÃ INTEIRO (LIGHTBOX COM ZOOM DE LUPA) */}
       {isFullscreen && selectedItem && selectedItem.images && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center select-none animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center select-none animate-in fade-in duration-300 overflow-hidden">
           
           {/* Botão Fechar */}
           <button 
@@ -874,17 +908,19 @@ export default function App() {
             <X className="w-8 h-8" />
           </button>
 
-          {/* Área Principal de Imagem com Zoom */}
-          <div 
-            className="w-full h-full overflow-auto flex items-center justify-center cursor-zoom-in"
-            onClick={() => setZoomLevel(prev => prev === 1 ? 2 : 1)}
-            style={{ cursor: zoomLevel > 1 ? 'zoom-out' : 'zoom-in' }}
-          >
+          {/* Área Principal de Imagem com Zoom Tipo Lupa */}
+          <div className="w-full h-full flex items-center justify-center relative">
             <img 
               src={selectedItem.images[activeImageIndex]} 
               alt="Modo Ecrã Inteiro"
-              style={{ transform: `scale(${zoomLevel})`, transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
-              className="max-w-full max-h-full object-contain origin-center"
+              onClick={handleImageZoomClick}
+              style={{ 
+                transform: `scale(${zoomLevel})`, 
+                transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                cursor: zoomLevel > 1 ? 'zoom-out' : 'crosshair'
+              }}
+              className="max-w-full max-h-full object-contain"
             />
           </div>
 
@@ -895,7 +931,7 @@ export default function App() {
                 onClick={handlePrevImage}
                 className="absolute left-6 top-1/2 -translate-y-1/2 text-white/50 hover:text-white bg-black/20 hover:bg-black/60 p-3 rounded-full z-50 transition-all backdrop-blur-sm"
               >
-                <ChevronLeft className="w-8 h-8" />
+                <ChevronLeftIcon className="w-8 h-8" />
               </button>
               <button 
                 onClick={handleNextImage}
@@ -909,21 +945,21 @@ export default function App() {
           {/* Controlos de Zoom Inferiores */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full z-50 border border-white/10 shadow-2xl">
             <button 
-              onClick={(e) => { e.stopPropagation(); setZoomLevel(z => Math.max(1, z - 0.5)); }} 
+              onClick={(e) => { e.stopPropagation(); setZoomOrigin({x:50, y:50}); setZoomLevel(z => Math.max(1, z - 0.5)); }} 
               className="text-white/70 hover:text-white transition-colors"
               title="Afastar"
             >
-              <ZoomOut className="w-6 h-6" />
+              <ZoomOutIcon className="w-6 h-6" />
             </button>
             <span className="text-white/50 text-xs font-bold font-mono min-w-[3ch] text-center">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button 
-              onClick={(e) => { e.stopPropagation(); setZoomLevel(z => Math.min(4, z + 0.5)); }} 
+              onClick={(e) => { e.stopPropagation(); setZoomOrigin({x:50, y:50}); setZoomLevel(z => Math.min(4, z + 0.5)); }} 
               className="text-white/70 hover:text-white transition-colors"
               title="Aproximar"
             >
-              <ZoomIn className="w-6 h-6" />
+              <ZoomInIcon className="w-6 h-6" />
             </button>
             
             {/* Divisória e Indicador de Galeria */}
