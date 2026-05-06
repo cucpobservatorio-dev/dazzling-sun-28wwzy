@@ -71,7 +71,7 @@ const getEmbedVideoUrl = (url) => {
   if (!url) return null;
   const cleanUrl = String(url).trim();
 
-  // Tratamento específico para YouTube (Usa youtube-nocookie para evitar bloqueios do iPhone/Safari)
+  // Tratamento específico para YouTube
   if (cleanUrl.toLowerCase().includes('youtube.com') || cleanUrl.toLowerCase().includes('youtu.be')) {
     let videoId = '';
     if (cleanUrl.includes('youtu.be/')) {
@@ -123,12 +123,12 @@ const normalizeKey = (rawKey) => {
   return EXPECTED_KEYS.find(k => k.toLowerCase() === lower) || rawKey;
 };
 
-// NOVO: Filtro Anti-Acentos (Limpa os slugs de acentos e espaços invisíveis)
+// Filtro Anti-Acentos (Limpa os slugs de acentos e espaços invisíveis)
 const cleanSlug = (str) => {
   if (!str) return '';
   return String(str)
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove acentos (ex: ó -> o)
+    .replace(/[\u0300-\u036f]/g, "") 
     .trim()
     .toLowerCase();
 };
@@ -136,12 +136,10 @@ const cleanSlug = (str) => {
 const fetchSheetData = async (sheetName) => {
   if (!SHEET_ID || SHEET_ID.includes('COLOQUE_AQUI')) return [];
   try {
-    // URL limpo e cache bypass via headers
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}&headers=1`;
     const res = await fetch(url, { cache: 'no-cache' });
     const text = await res.text();
     
-    // Escudo: Se a Google devolver HTML (página de erro), ignoramos para não crashar a app
     if (text.trim().startsWith('<')) {
       console.error(`Erro: O Google Sheets retornou HTML para a folha ${sheetName}.`);
       return [];
@@ -172,13 +170,13 @@ const fetchSheetData = async (sheetName) => {
         let value = (cell && cell.v !== null) ? cell.v : '';
         if (typeof value === 'string') value = value.trim();
         
-        // --- BLINDAGEM DE SLUGS: Remoção automática de acentos e espaços ---
+        // --- NOVO SUPER-FILTRO: Corta por vírgulas OU parágrafos/Enters (/[,\n]+/) ---
         if (key === 'id') {
            obj[key] = value ? cleanSlug(value) : '';
         } else if (key === 'images') {
-           obj[key] = value ? String(value).split(',').map(s => getDirectImageUrl(s.trim())).filter(Boolean) : [];
+           obj[key] = value ? String(value).split(/[,\n]+/).map(s => getDirectImageUrl(s.trim())).filter(Boolean) : [];
         } else if (['ownerIds', 'relatedPalacetes', 'relatedFigures', 'relatedArticles'].includes(key)) {
-           obj[key] = value ? String(value).split(',').map(s => cleanSlug(s)).filter(Boolean) : [];
+           obj[key] = value ? String(value).split(/[,\n]+/).map(s => cleanSlug(s)).filter(Boolean) : [];
         } else {
            obj[key] = value;
         }
@@ -318,19 +316,18 @@ export default function App() {
   // ============================================================================
   const getAllTags = (item) => {
     if (!item) return [];
-    const tags = [item.id]; // O próprio ID é uma tag
+    const tags = [item.id]; 
     if (item.ownerIds) tags.push(...item.ownerIds);
     if (item.relatedPalacetes) tags.push(...item.relatedPalacetes);
     if (item.relatedArticles) tags.push(...item.relatedArticles);
     if (item.relatedFigures) tags.push(...item.relatedFigures);
-    return tags.filter(Boolean); // Limpa valores nulos/vazios
+    return tags.filter(Boolean); 
   };
 
   const areRelated = (itemA, itemB) => {
     if (!itemA || !itemB || itemA.id === itemB.id) return false;
     const tagsA = getAllTags(itemA);
     const tagsB = getAllTags(itemB);
-    // Existe ligação se partilharem pelo menos UMA tag/slug em comum!
     return tagsA.some(tag => tagsB.includes(tag));
   };
 
@@ -353,15 +350,14 @@ export default function App() {
   const handleImageZoomClick = (e) => {
     e.stopPropagation();
     if (zoomLevel === 1) {
-      // Calcula o ponto exato onde o utilizador clicou na imagem
       const rect = e.target.getBoundingClientRect();
       const clickX = ((e.clientX - rect.left) / rect.width) * 100;
       const clickY = ((e.clientY - rect.top) / rect.height) * 100;
       
       setZoomOrigin({ x: clickX, y: clickY });
-      setZoomLevel(2.5); // Fator de aproximação
+      setZoomLevel(2.5);
     } else {
-      setZoomLevel(1); // Volta ao tamanho original
+      setZoomLevel(1); 
     }
   };
 
@@ -400,7 +396,6 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
              
-             {/* Lógica do Logótipo no Header com Fallback */}
              {!logoHeaderError && resolvedLogoUrl && resolvedLogoUrl !== '' && !resolvedLogoUrl.includes('COLOQUE_AQUI') ? (
                 <img src={resolvedLogoUrl} alt="Logo" className="w-10 h-10 object-contain" onError={() => setLogoHeaderError(true)} />
              ) : (
@@ -424,7 +419,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MODAL DE AUTENTICAÇÃO (CADEADO) */}
+      {/* MODAL DE AUTENTICAÇÃO */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#1a1c29]/95 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm p-8 relative animate-in zoom-in-95 duration-300">
@@ -543,7 +538,6 @@ export default function App() {
                 </div>
 
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                  {/* Botão de Reset */}
                   <button 
                     onClick={() => setFilterLocation({ distrito: 'Todos', concelho: 'Todos' })}
                     className={`w-full text-left text-sm font-bold uppercase tracking-widest py-2 px-3 rounded-sm transition-colors ${filterLocation.distrito === 'Todos' ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50 hover:text-amber-600'}`}
@@ -551,7 +545,6 @@ export default function App() {
                     Todo o País
                   </button>
 
-                  {/* Acordeão de Distritos */}
                   {distritosList.map(distrito => {
                     const isExpanded = filterLocation.distrito === distrito;
                     return (
@@ -564,7 +557,6 @@ export default function App() {
                           <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'text-amber-600 rotate-90' : 'text-gray-400'}`} />
                         </button>
                         
-                        {/* Lista de Concelhos */}
                         {isExpanded && (
                           <div className="pl-3 py-1 space-y-1 border-l-2 border-amber-100 ml-4">
                             <button
@@ -620,14 +612,12 @@ export default function App() {
                              <Building className="w-12 h-12 text-gray-300" />
                            )}
                            
-                           {/* Ícone de Vídeo se existir */}
                            {palacete.videoUrl && (
                              <div className="absolute top-3 right-3 bg-amber-600/90 text-white p-1.5 rounded-full shadow-sm">
                                <Video className="w-4 h-4" />
                              </div>
                            )}
 
-                           {/* Contador de fotos */}
                            {palacete.images && palacete.images.length > 1 && (
                              <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-1 rounded-sm tracking-widest flex items-center gap-1">
                                +{palacete.images.length - 1} FOTOS
@@ -728,7 +718,6 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3 opacity-40 grayscale">
              
-             {/* Lógica do Logótipo no Footer com Fallback */}
              {!logoFooterError && resolvedLogoUrl && resolvedLogoUrl !== '' && !resolvedLogoUrl.includes('COLOQUE_AQUI') ? (
                 <img src={resolvedLogoUrl} alt="Logo CUCP" className="w-10 h-10 object-contain" onError={() => setLogoFooterError(true)} />
              ) : (
@@ -758,7 +747,6 @@ export default function App() {
             <div className="w-full md:w-2/5 h-64 md:h-auto bg-gray-200 flex flex-col flex-shrink-0 relative border-r border-gray-200/50">
               {selectedItem.images && selectedItem.images.length > 0 ? (
                  <>
-                   {/* Imagem Principal com Opção de Expandir (Botão Visível Sempre) */}
                    <div 
                      className="flex-1 relative w-full h-full min-h-[250px] cursor-zoom-in group bg-black"
                      onClick={() => setIsFullscreen(true)}
@@ -769,14 +757,12 @@ export default function App() {
                        alt={selectedItem.title || selectedItem.name} 
                        className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity duration-300" 
                      />
-                     {/* Botão Expandir visível permanentemente (Melhor para Touch/Tablets/Edge) */}
                      <div className="absolute top-3 left-3 bg-black/70 text-white px-3 py-1.5 rounded-sm backdrop-blur-sm shadow-md flex items-center gap-2 hover:bg-amber-600 transition-colors">
                        <ExpandIcon className="w-4 h-4" />
                        <span className="text-[10px] font-bold uppercase tracking-widest">Expandir</span>
                      </div>
                    </div>
                    
-                   {/* Miniaturas (Thumbnails) */}
                    {selectedItem.images.length > 1 && (
                      <div className="flex gap-2 p-3 bg-gray-900 overflow-x-auto flex-shrink-0">
                        {selectedItem.images.map((img, idx) => (
@@ -800,14 +786,13 @@ export default function App() {
               )}
             </div>
 
-            {/* SEÇÃO DE TEXTO (Com barra de scroll independente) */}
+            {/* SEÇÃO DE TEXTO */}
             <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col overflow-y-auto">
               <span className="text-amber-700 font-bold tracking-widest uppercase text-[9px] mb-2 block">
                 {modalType === 'palacete' ? 'Ficha de Património' : modalType === 'figura' ? 'Nota Biográfica' : 'Ensaio Histórico'}
               </span>
               <h3 className="text-3xl font-serif text-[#1a1c29] mb-6 leading-tight">{selectedItem.name || selectedItem.title}</h3>
               
-              {/* VÍDEO EMBEBIDO (Se Existir) */}
               {selectedItem.videoUrl && (
                 <div className="mb-6 w-full flex-shrink-0" style={{ aspectRatio: '16/9' }}>
                   {(String(selectedItem.videoUrl).toLowerCase().includes('youtube') || 
@@ -843,7 +828,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* RENDERIZAÇÃO INTELIGENTE DAS RELAÇÕES CRUZADAS (TAGS PARTILHADAS) */}
+              {/* RENDERIZAÇÃO INTELIGENTE DAS RELAÇÕES CRUZADAS */}
               {(() => {
                 const relatedFigs = getRelatedFigures(selectedItem);
                 const relatedPals = getRelatedPalacetes(selectedItem);
@@ -859,7 +844,6 @@ export default function App() {
                     </h4>
                     
                     <div className="space-y-3">
-                      {/* 1. Figuras Partilhadas */}
                       {relatedFigs.map(fig => (
                         <button key={fig.id} onClick={() => openModal(fig, 'figura')} className="flex items-center gap-3 p-3 bg-white border border-gray-200 hover:border-amber-400 rounded-sm w-full text-left transition-colors group">
                           <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
@@ -873,7 +857,6 @@ export default function App() {
                         </button>
                       ))}
 
-                      {/* 2. Palacetes Partilhados */}
                       {relatedPals.map(house => (
                         <button key={house.id} onClick={() => openModal(house, 'palacete')} className="flex items-center gap-3 p-3 bg-white border border-gray-200 hover:border-amber-400 rounded-sm w-full text-left transition-colors group">
                           <div className="w-10 h-10 rounded-sm overflow-hidden flex-shrink-0 bg-gray-200">
@@ -887,7 +870,6 @@ export default function App() {
                         </button>
                       ))}
 
-                      {/* 3. Artigos Partilhados */}
                       {relatedArts.map(art => (
                         <button key={art.id} onClick={() => openModal(art, 'artigo')} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-3 rounded-sm text-xs text-slate-700 hover:bg-slate-100 transition-colors w-full text-left group">
                           <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0"/> 
@@ -908,7 +890,6 @@ export default function App() {
       {isFullscreen && selectedItem && selectedItem.images && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center select-none animate-in fade-in duration-300 overflow-hidden">
           
-          {/* Botão Fechar */}
           <button 
             onClick={() => setIsFullscreen(false)} 
             className="absolute top-6 right-6 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 p-2 rounded-full z-50 transition-all"
@@ -917,7 +898,6 @@ export default function App() {
             <X className="w-8 h-8" />
           </button>
 
-          {/* Área Principal de Imagem com Zoom Tipo Lupa */}
           <div className="w-full h-full flex items-center justify-center relative">
             <img 
               src={selectedItem.images[activeImageIndex]} 
@@ -933,7 +913,6 @@ export default function App() {
             />
           </div>
 
-          {/* Controlos de Navegação (Setas) */}
           {selectedItem.images.length > 1 && (
             <>
               <button 
@@ -951,7 +930,6 @@ export default function App() {
             </>
           )}
 
-          {/* Controlos de Zoom Inferiores */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full z-50 border border-white/10 shadow-2xl">
             <button 
               onClick={(e) => { e.stopPropagation(); setZoomOrigin({x:50, y:50}); setZoomLevel(z => Math.max(1, z - 0.5)); }} 
@@ -971,7 +949,6 @@ export default function App() {
               <ZoomInIcon className="w-6 h-6" />
             </button>
             
-            {/* Divisória e Indicador de Galeria */}
             {selectedItem.images.length > 1 && (
               <>
                 <div className="w-px h-6 bg-white/20 mx-2"></div>
