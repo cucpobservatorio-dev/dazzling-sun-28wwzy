@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, Tag, Loader2, Database, ExternalLink, Video } from 'lucide-react';
+import { Building, User, MapPin, X, ArrowRight, BookOpen, ChevronRight, ChevronLeft, Tag, Loader2, Database, ExternalLink, Video, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 // ============================================================================
 // ÍCONES NATIVOS (À prova de falhas de versão do lucide-react)
@@ -123,6 +123,16 @@ const normalizeKey = (rawKey) => {
   return EXPECTED_KEYS.find(k => k.toLowerCase() === lower) || rawKey;
 };
 
+// NOVO: Filtro Anti-Acentos (Limpa os slugs de acentos e espaços invisíveis)
+const cleanSlug = (str) => {
+  if (!str) return '';
+  return String(str)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos (ex: ó -> o)
+    .trim()
+    .toLowerCase();
+};
+
 const fetchSheetData = async (sheetName) => {
   if (!SHEET_ID || SHEET_ID.includes('COLOQUE_AQUI')) return [];
   try {
@@ -156,16 +166,19 @@ const fetchSheetData = async (sheetName) => {
       row.c.forEach((cell, i) => {
         const rawKey = headers[i];
         if (!rawKey) return; 
-        if (rawKey.toLowerCase().includes('carimbo')) return;
+        if (rawKey.toLowerCase().includes('carimbo') || rawKey.toLowerCase().includes('timestamp')) return;
 
         const key = normalizeKey(rawKey);
         let value = (cell && cell.v !== null) ? cell.v : '';
         if (typeof value === 'string') value = value.trim();
         
-        if (key === 'images') {
-           obj[key] = value ? value.toString().split(',').map(s => getDirectImageUrl(s.trim())) : [];
+        // --- BLINDAGEM DE SLUGS: Remoção automática de acentos e espaços ---
+        if (key === 'id') {
+           obj[key] = value ? cleanSlug(value) : '';
+        } else if (key === 'images') {
+           obj[key] = value ? String(value).split(',').map(s => getDirectImageUrl(s.trim())).filter(Boolean) : [];
         } else if (['ownerIds', 'relatedPalacetes', 'relatedFigures', 'relatedArticles'].includes(key)) {
-           obj[key] = value ? value.toString().split(',').map(s => s.trim()) : [];
+           obj[key] = value ? String(value).split(',').map(s => cleanSlug(s)).filter(Boolean) : [];
         } else {
            obj[key] = value;
         }
@@ -300,13 +313,30 @@ export default function App() {
     document.body.style.overflow = 'auto';
   };
 
-  const getOwnerForPalacete = (ownerId) => figures.find(f => f.id === ownerId);
-  const getPalacetesForFigure = (houseIds) => palacetes.filter(p => houseIds?.includes(p.id));
-  const getArtigosRelacionados = (id, type) => artigos.filter(art => 
-    (type === 'figura' && art.relatedFigures?.includes(id)) ||
-    (type === 'palacete' && art.relatedPalacetes?.includes(id)) ||
-    (type === 'artigo' && (art.relatedFigures?.includes(id) || art.relatedPalacetes?.includes(id)))
-  );
+  // ============================================================================
+  // NOVO MOTOR DE RELACIONAMENTOS: TAGS PARTILHADAS (SHARED TAGS)
+  // ============================================================================
+  const getAllTags = (item) => {
+    if (!item) return [];
+    const tags = [item.id]; // O próprio ID é uma tag
+    if (item.ownerIds) tags.push(...item.ownerIds);
+    if (item.relatedPalacetes) tags.push(...item.relatedPalacetes);
+    if (item.relatedArticles) tags.push(...item.relatedArticles);
+    if (item.relatedFigures) tags.push(...item.relatedFigures);
+    return tags.filter(Boolean); // Limpa valores nulos/vazios
+  };
+
+  const areRelated = (itemA, itemB) => {
+    if (!itemA || !itemB || itemA.id === itemB.id) return false;
+    const tagsA = getAllTags(itemA);
+    const tagsB = getAllTags(itemB);
+    // Existe ligação se partilharem pelo menos UMA tag/slug em comum!
+    return tagsA.some(tag => tagsB.includes(tag));
+  };
+
+  const getRelatedFigures = (item) => figures.filter(f => areRelated(item, f));
+  const getRelatedPalacetes = (item) => palacetes.filter(p => areRelated(item, p));
+  const getRelatedArticles = (item) => artigos.filter(a => areRelated(item, a));
 
   // Lógica do Ecrã Inteiro de Imagens e Zoom Dinâmico
   const handleNextImage = (e) => {
@@ -813,83 +843,62 @@ export default function App() {
                 )}
               </div>
 
-              <div className="mt-auto">
-                <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-1">
-                  <Tag className="w-3 h-3"/> Registos Relacionados
-                </h4>
-                
-                <div className="space-y-3">
-                  {modalType === 'palacete' && (
-                    <>
-                      {selectedItem.ownerIds?.map(ownerId => {
-                        const owner = getOwnerForPalacete(ownerId);
-                        if (!owner) return null;
-                        return (
-                          <button key={ownerId} onClick={() => openModal(owner, 'figura')} className="flex items-center gap-3 p-3 bg-white border border-gray-200 hover:border-amber-400 rounded-sm w-full text-left transition-colors group">
-                            <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
-                              {owner.images && owner.images[0] ? <img src={owner.images[0]} alt="" className="w-full h-full object-cover"/> : <User className="w-5 h-5 m-auto text-gray-400 mt-2"/>}
-                            </div>
-                            <div>
-                              <p className="text-[9px] uppercase tracking-widest text-amber-600 font-bold mb-0.5">Proprietário</p>
-                              <p className="text-sm font-serif text-[#1a1c29] group-hover:text-amber-700">{owner.name}</p>
-                            </div>
-                            <ChevronRight className="w-4 h-4 ml-auto text-gray-400 group-hover:text-amber-500" />
-                          </button>
-                        )
-                      })}
-                    </>
-                  )}
+              {/* RENDERIZAÇÃO INTELIGENTE DAS RELAÇÕES CRUZADAS (TAGS PARTILHADAS) */}
+              {(() => {
+                const relatedFigs = getRelatedFigures(selectedItem);
+                const relatedPals = getRelatedPalacetes(selectedItem);
+                const relatedArts = getRelatedArticles(selectedItem);
+                const hasRelated = relatedFigs.length > 0 || relatedPals.length > 0 || relatedArts.length > 0;
 
-                  {modalType === 'figura' && (
-                    <>
-                      {getPalacetesForFigure(selectedItem.relatedPalacetes).map(house => (
+                if (!hasRelated) return null;
+
+                return (
+                  <div className="mt-auto">
+                    <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-1">
+                      <Tag className="w-3 h-3"/> Registos Relacionados
+                    </h4>
+                    
+                    <div className="space-y-3">
+                      {/* 1. Figuras Partilhadas */}
+                      {relatedFigs.map(fig => (
+                        <button key={fig.id} onClick={() => openModal(fig, 'figura')} className="flex items-center gap-3 p-3 bg-white border border-gray-200 hover:border-amber-400 rounded-sm w-full text-left transition-colors group">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
+                            {fig.images && fig.images[0] ? <img src={fig.images[0]} alt="" className="w-full h-full object-cover"/> : <User className="w-5 h-5 m-auto text-gray-400 mt-2"/>}
+                          </div>
+                          <div>
+                            <p className="text-[9px] uppercase tracking-widest text-amber-600 font-bold mb-0.5">Figura Relacionada</p>
+                            <p className="text-sm font-serif text-[#1a1c29] group-hover:text-amber-700">{fig.name}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 ml-auto text-gray-400 group-hover:text-amber-500" />
+                        </button>
+                      ))}
+
+                      {/* 2. Palacetes Partilhados */}
+                      {relatedPals.map(house => (
                         <button key={house.id} onClick={() => openModal(house, 'palacete')} className="flex items-center gap-3 p-3 bg-white border border-gray-200 hover:border-amber-400 rounded-sm w-full text-left transition-colors group">
                           <div className="w-10 h-10 rounded-sm overflow-hidden flex-shrink-0 bg-gray-200">
                             {house.images && house.images[0] ? <img src={house.images[0]} alt="" className="w-full h-full object-cover"/> : <Building className="w-5 h-5 m-auto text-gray-400 mt-2"/>}
                           </div>
                           <div>
-                            <p className="text-[9px] uppercase tracking-widest text-amber-600 font-bold mb-0.5">Edificação</p>
+                            <p className="text-[9px] uppercase tracking-widest text-amber-600 font-bold mb-0.5">Património Relacionado</p>
                             <p className="text-sm font-serif text-[#1a1c29] group-hover:text-amber-700">{house.name}</p>
                           </div>
                           <ChevronRight className="w-4 h-4 ml-auto text-gray-400 group-hover:text-amber-500" />
                         </button>
                       ))}
-                    </>
-                  )}
 
-                  {getArtigosRelacionados(selectedItem.id, modalType).map(art => (
-                    <button key={art.id} onClick={() => openModal(art, 'artigo')} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-3 rounded-sm text-xs text-slate-700 hover:bg-slate-100 transition-colors w-full text-left group">
-                      <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0"/> 
-                      <span className="font-bold">Tema / Ensaio:</span> {art.title}
-                      <ChevronRight className="w-4 h-4 ml-auto text-gray-400 group-hover:text-amber-500" />
-                    </button>
-                  ))}
-
-                  {modalType === 'artigo' && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedItem.relatedFigures?.map(id => {
-                        const fig = figures.find(f => f.id === id);
-                        if (!fig) return null;
-                        return (
-                          <button key={id} onClick={() => openModal(fig, 'figura')} className="bg-amber-50 text-amber-900 border border-amber-200 px-3 py-2 rounded-sm text-xs hover:bg-amber-100 transition-colors flex items-center gap-2">
-                            <User className="w-3 h-3 text-amber-600"/> <span className="font-bold">{fig.name}</span>
-                          </button>
-                        );
-                      })}
-                      {selectedItem.relatedPalacetes?.map(id => {
-                        const pal = palacetes.find(p => p.id === id);
-                        if (!pal) return null;
-                        return (
-                          <button key={id} onClick={() => openModal(pal, 'palacete')} className="bg-slate-100 text-slate-800 border border-slate-200 px-3 py-2 rounded-sm text-xs hover:bg-slate-200 transition-colors flex items-center gap-2">
-                            <Building className="w-3 h-3 text-slate-500"/> <span className="font-bold">{pal.name}</span>
-                          </button>
-                        );
-                      })}
+                      {/* 3. Artigos Partilhados */}
+                      {relatedArts.map(art => (
+                        <button key={art.id} onClick={() => openModal(art, 'artigo')} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-3 rounded-sm text-xs text-slate-700 hover:bg-slate-100 transition-colors w-full text-left group">
+                          <BookOpen className="w-4 h-4 text-amber-600 flex-shrink-0"/> 
+                          <span className="font-bold">Tema / Ensaio:</span> {art.title}
+                          <ChevronRight className="w-4 h-4 ml-auto text-gray-400 group-hover:text-amber-500" />
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </div>
-
-              </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
